@@ -68,7 +68,7 @@ class TableSql
 	
     function CreateTable($str)
     {
-    	$strQuery = 'CREATE TABLE IF NOT EXISTS `n5gl0n39mnyn183l_camman`.`'
+    	$strQuery = 'CREATE TABLE IF NOT EXISTS `'.DB_DATABASE.'`.`'
         	 . $this->strName
         	 . '` ('
         	 . $str
@@ -79,7 +79,7 @@ class TableSql
     // ALTER TABLE这个写法每次只能加一个
     function AlterTable($str)
     {
-    	$strQuery = 'ALTER TABLE `n5gl0n39mnyn183l_camman`.`'
+    	$strQuery = 'ALTER TABLE `'.DB_DATABASE.'`.`'
         	 . $this->strName
         	 . '` ADD '
         	 . $str;
@@ -88,7 +88,7 @@ class TableSql
          
     function DropTable()
     {
-    	$strQuery = 'DROP TABLE IF EXISTS `n5gl0n39mnyn183l_camman`.`'
+    	$strQuery = 'DROP TABLE IF EXISTS `'.DB_DATABASE.'`.`'
         	. $this->strName
         	. '`';
         return $this->_query($strQuery, 'drop table failed');

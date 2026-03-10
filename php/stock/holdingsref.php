@@ -11,6 +11,7 @@ class HoldingsReference extends MyStockReference
     var $strNav;
     var $strHoldingsDate;
     var $arHoldingsRatio = array();
+    var $bRateNotConfigured = false;   // 汇率未配置时由 _estNav 置为 true，供页面提示
     
     public function __construct($strSymbol) 
     {
@@ -83,18 +84,41 @@ class HoldingsReference extends MyStockReference
     	return $this->nav_ref->GetPrice();
     }
     
+    /** 从 ref 或库中取汇率，避免 CnyReference 初始化时未加载到数据导致一直为 0 */
+    function _getCnyRate($cny_ref, $strDate = false)
+    {
+        $v = $strDate ? $cny_ref->GetClose($strDate) : $cny_ref->GetPrice();
+        if ($v !== false && $v !== '' && floatval($v) >= 1e-10)	return floatval($v);
+        $id = $cny_ref->GetStockId();
+        if ($id)	$v = $strDate ? SqlGetNavByDate($id, $strDate) : SqlGetNav($id);
+        return ($v !== false && $v !== '' && floatval($v) >= 1e-10) ? floatval($v) : false;
+    }
+
     function GetAdjustHkd($strDate = false)
     {
-        if ($strHKDCNY = $this->hkcny_ref->GetClose($this->strHoldingsDate))
-        {
-        	$fOldUSDHKD = floatval($this->uscny_ref->GetClose($this->strHoldingsDate)) / floatval($strHKDCNY);
-        }
-        else
-        {
-        	return 1.0;
-        }
-        
-		$fUSDHKD = floatval($this->uscny_ref->GetPrice()) / floatval($this->hkcny_ref->GetPrice());
+        // 持仓日无汇率时用最新价，避免仅因“持仓日无历史汇率”就整页显示请配置汇率
+        $strHKDCNY = $this->hkcny_ref->GetClose($this->strHoldingsDate);
+        if ($strHKDCNY === false || $strHKDCNY === '')	$strHKDCNY = $this->hkcny_ref->GetPrice();
+        $strUSDCNYHoldings = $this->uscny_ref->GetClose($this->strHoldingsDate);
+        if ($strUSDCNYHoldings === false || $strUSDCNYHoldings === '')	$strUSDCNYHoldings = $this->uscny_ref->GetPrice();
+
+        // ref 可能初始化时未加载到数据，直接查库兜底
+        if (($strHKDCNY === false || $strHKDCNY === '') && $this->hkcny_ref->GetStockId())
+            $strHKDCNY = SqlGetNavByDate($this->hkcny_ref->GetStockId(), $this->strHoldingsDate) ?: SqlGetNav($this->hkcny_ref->GetStockId());
+        if (($strUSDCNYHoldings === false || $strUSDCNYHoldings === '') && $this->uscny_ref->GetStockId())
+            $strUSDCNYHoldings = SqlGetNavByDate($this->uscny_ref->GetStockId(), $this->strHoldingsDate) ?: SqlGetNav($this->uscny_ref->GetStockId());
+
+        if ($strHKDCNY === false || $strHKDCNY === '' || $strUSDCNYHoldings === false || $strUSDCNYHoldings === '')
+        	return false;
+        $fHkd = floatval($strHKDCNY);
+        if ($fHkd < 1e-10)	return false;
+        $fOldUSDHKD = floatval($strUSDCNYHoldings) / $fHkd;
+
+		$fHkcny = $this->_getCnyRate($this->hkcny_ref);
+		if ($fHkcny === false)	return false;
+		$fUscny = $this->_getCnyRate($this->uscny_ref);
+		if ($fUscny === false)	return false;
+		$fUSDHKD = $fUscny / $fHkcny;
 		if ($strDate)	
 		{
 			if ($strHKDCNY = $this->hkcny_ref->GetClose($strDate))	
@@ -102,12 +126,14 @@ class HoldingsReference extends MyStockReference
 				if ($strUSDCNY = $this->uscny_ref->GetClose($strDate))		$fUSDHKD = floatval($strUSDCNY) / floatval($strHKDCNY);
 			}
 		}
+		if ($fUSDHKD < 1e-10)	return false;
 		return $fOldUSDHKD / $fUSDHKD;
     }
     
     function GetAdjustCny($strDate = false)
     {
-		$fUSDCNY = floatval($this->uscny_ref->GetPrice());
+		$fUSDCNY = $this->_getCnyRate($this->uscny_ref);
+		if ($fUSDCNY === false)	return false;
 		if ($strOldUSDCNY = $this->uscny_ref->GetClose($this->strHoldingsDate))
 		{
 			$fOldUSDCNY = floatval($strOldUSDCNY);
@@ -121,7 +147,13 @@ class HoldingsReference extends MyStockReference
 		{
 			if ($strUSDCNY = $this->uscny_ref->GetClose($strDate))		$fUSDCNY = floatval($strUSDCNY);
 		}
+		if ($fUSDCNY < 1e-10)	return false;
 		return $fOldUSDCNY / $fUSDCNY;
+    }
+
+    function GetRateNotConfigured()
+    {
+    	return $this->bRateNotConfigured;
     }
 
     function _getStrictRef($strSymbol)
@@ -136,9 +168,15 @@ class HoldingsReference extends MyStockReference
     // (x - x0) / x0 = sum{ r * (y - y0) / y0} 
     function _estNav($strDate = false, $bStrict = false)
     {
+    	$this->bRateNotConfigured = false;
     	$arStrict = GetSecondaryListingArray();    	
     	$fAdjustHkd = $this->GetAdjustHkd($strDate);
 		$fAdjustCny = $this->GetAdjustCny($strDate);
+		if ($fAdjustHkd === false || $fAdjustCny === false)
+		{
+			$this->bRateNotConfigured = true;
+			return false;
+		}
     	
 		$his_sql = GetStockHistorySql();
 		$fTotalChange = 0.0;
@@ -188,7 +226,11 @@ class HoldingsReference extends MyStockReference
 
     function GetNavChange()
     {
-    	return $this->_estNav() / floatval($this->strNav);
+    	$f = $this->_estNav();
+    	if ($f === false)	return false;
+    	$fNav = floatval($this->strNav);
+    	if ($fNav < 1e-10)	return false;
+    	return $f / $fNav;
     }
     
     function _getEstDate()
@@ -239,7 +281,9 @@ class HoldingsReference extends MyStockReference
     function GetOfficialNav($bStrict = false)
     {
     	$strDate = $this->GetOfficialDate();
-    	$strNav = strval($this->_estNav($strDate, $bStrict));
+    	$fNav = $this->_estNav($strDate, $bStrict);
+    	if ($fNav === false)	return false;
+    	$strNav = strval($fNav);
    		StockUpdateEstResult($this->GetFundEstSql(), $this->GetStockId(), $strNav, $strDate);
    		return $strNav;
     }
@@ -249,7 +293,8 @@ class HoldingsReference extends MyStockReference
     	$strDate = $this->GetOfficialDate(); 
 		if (($this->uscny_ref->GetDate() != $strDate) || ($this->_getEstDate() != $strDate))
 		{
-			return strval($this->_estNav(false, $bStrict));
+			$f = $this->_estNav(false, $bStrict);
+			return ($f === false) ? false : strval($f);
 		}
 		return false;
     }
@@ -260,7 +305,8 @@ class HoldingsReference extends MyStockReference
     	{
     		return false;
     	}
-		return strval($this->_estNav(false, true));
+    	$f = $this->_estNav(false, true);
+    	return ($f === false) ? false : strval($f);
     }
 }
 

@@ -4,6 +4,14 @@ require_once('sqlkeytable.php');
 require_once('sqldailyclose.php');
 require_once('sqlholdings.php');
 
+// 仅去掉 MySQL 不接受的非法 UTF-8 字节（如过长编码）。不在此做 GBK 转换，由上游 GetChineseName 用 mb_convert_encoding 转好 UTF-8
+function _StockNameToUtf8($str)
+{
+	if ($str === '' || $str === false)	return $str;
+	$clean = @iconv('UTF-8', 'UTF-8//IGNORE', $str);
+	return ($clean !== false && $clean !== '') ? $clean : preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $str);
+}
+
 class NavHistorySql extends DailyCloseSql
 {
     public function __construct() 
@@ -141,6 +149,7 @@ class StockSql extends KeyNameSql
 
     function WriteSymbol($strSymbol, $strName)
     {
+    	$strName = _StockNameToUtf8($strName);
     	$strName = SqlCleanString($strName);
     	$ar = array('symbol' => $strSymbol,
     				  'name' => $strName);

@@ -386,6 +386,7 @@ class FundPairReference extends MyPairReference
     
     function GetOfficialNav()
     {
+        if ($this->pair_ref === false)	return false;
         $this->strOfficialDate = $this->pair_ref->GetDate();
         if ($this->cny_ref)
         {

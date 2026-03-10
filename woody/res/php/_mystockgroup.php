@@ -2,6 +2,7 @@
 require_once('_stock.php');
 require_once('_idgroup.php');
 require_once('_editgroupform.php');
+require_once('../../php/stock/chinamoney.php');
 require_once('../../php/ui/referenceparagraph.php');
 require_once('../../php/ui/ahparagraph.php');
 require_once('../../php/ui/fundlistparagraph.php');
@@ -24,6 +25,9 @@ function in_array_ref($ref, $arRef)
 
 function _echoStockGroupArray($arStock, $bWide)
 {
+    // 提前拉取 USCNY/HKCNY 等汇率，供估值表使用
+    GetChinaMoney(new CnyReference('USCNY'));
+
     StockPrefetchArrayExtendedData($arStock);
 
     $arRef = array();
@@ -39,7 +43,8 @@ function _echoStockGroupArray($arStock, $bWide)
         if ($ref->IsFundA())
         {
        		$fund = StockGetFundReference($strSymbol);
-       		if ($fund->GetOfficialNav())	$arFund[] = $fund;
+       		// 有数据即展示：估值算不出时显示「请配置汇率」，不因 GetOfficialNav() 为 false 而整项不显示
+       		if (RefHasData($fund))	$arFund[] = $fund;
        	}
    		else
    		{

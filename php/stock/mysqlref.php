@@ -86,6 +86,12 @@ class MysqlReference extends StockReference
     {
     	if ($this->bConvertGB2312)
     	{
+    		// 优先用 mb_convert_encoding 覆盖完整 GBK，避免自定义 GbToUtf8 表不全导致缺字或乱码
+    		if (function_exists('mb_convert_encoding'))
+    		{
+    			$utf8 = @mb_convert_encoding($this->strName, 'UTF-8', 'GBK');
+    			if ($utf8 !== false && $utf8 !== '')	return $utf8;
+    		}
     		return GbToUtf8($this->strName);
     	}
    		return $this->strName;
@@ -100,6 +106,11 @@ class MysqlReference extends StockReference
 
     	if ($this->bConvertGB2312)
     	{
+    		if (function_exists('mb_convert_encoding'))
+    		{
+    			$utf8 = @mb_convert_encoding($this->strChineseName, 'UTF-8', 'GBK');
+    			if ($utf8 !== false && $utf8 !== '')	return $utf8;
+    		}
     		return GbToUtf8($this->strChineseName);
     	}
     	return $this->strChineseName;

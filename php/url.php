@@ -2,11 +2,23 @@
 define('URL_PHP', '.php');
 define('URL_CNPHP', 'cn.php');
 
+// 仅接受公网 IPv4（用于 X-Forwarded-For / HTTP_CLIENT_IP，防止伪造）
 function filter_valid_ip($strIp)
 {
 	if ($strIp)
 	{
 		return filter_var($strIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE);
+	}
+	return false;
+}
+
+// REMOTE_ADDR 由 Web 服务器设置，可信；本地访问时为 127.0.0.1 或 ::1，需允许私有与 IPv6
+function filter_valid_ip_allow_private($strIp)
+{
+	if ($strIp)
+	{
+		// 接受任意合法 IP（IPv4 含 127.0.0.1，IPv6 含 ::1）
+		return filter_var($strIp, FILTER_VALIDATE_IP) ?: false;
 	}
 	return false;
 }
@@ -18,15 +30,15 @@ function UrlGetIp()
 	    $strIp = trim($_SERVER['HTTP_X_FORWARDED_FOR']);
 	    if (filter_valid_ip($strIp))    return $strIp;
 	}
-	else if (isset($_SERVER['HTTP_CLIENT_IP']))
+	if (isset($_SERVER['HTTP_CLIENT_IP']))
 	{
 	    $strIp = trim($_SERVER['HTTP_CLIENT_IP']);
 	    if (filter_valid_ip($strIp))    return $strIp;
 	}
-	else
+	if (isset($_SERVER['REMOTE_ADDR']))
 	{
 		$strIp = trim($_SERVER['REMOTE_ADDR']);
-	    if (filter_valid_ip($strIp))    return $strIp;
+		if (filter_valid_ip_allow_private($strIp))    return $strIp;
 	}
 	die('Unknown IP');
 	return false;

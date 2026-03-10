@@ -136,7 +136,7 @@ function SqlCreateStockGroupItemTable()
 
 function SqlAlterStockGroupItemTable()
 {    
-    $str = 'ALTER TABLE `camman`.`stockgroupitem` ADD '
+    $str = 'ALTER TABLE `'.DB_DATABASE.'`.`stockgroupitem` ADD '
          . ' INDEX ( `record` )';
 //         . ' `quantity` INT DEFAULT \'0\'';
 //         . ' `cost` DOUBLE(10,3) DEFAULT \'0.0\'';

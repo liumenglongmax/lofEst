@@ -15,8 +15,11 @@ function ImgAutoQuote($strPathName, $strText = '', $bChinese = true)
 {
 	$iDisplayHeight = LayoutGetDisplayHeight();
 	$iFit = LayoutGetDisplayWidth();
-	
+
 	$imgOrg = imagecreatefromjpeg(UrlModifyRootFileName($strPathName));
+	if ($imgOrg === false)
+		return GetBreakElement().GetQuoteElement($strText).GetBreakElement();
+
 	$iWidth = imagesx($imgOrg);
 	$iHeight = imagesy($imgOrg);
 //	DebugString($strPathName.':'.strval($iWidth).'x'.strval($iHeight), true);

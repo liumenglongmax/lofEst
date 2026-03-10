@@ -9,6 +9,12 @@ function _echoFundEstTableItem($ref, $bFair, $bWide = false)
     if (RefHasData($ref) == false)      return;
 
     $ar = array($ref->GetStockLink());
+    if ($bWide == false)
+    {
+    	$strName = SqlGetStockName($ref->GetSymbol());
+    	if (empty($strName) && method_exists($ref, 'GetChineseName'))	$strName = $ref->GetChineseName();
+    	$ar[] = $strName ? $strName : '';
+    }
     if ($bWide)
     {
     	$stock_ref = (method_exists($ref, 'GetStockRef')) ? $ref->GetStockRef() : $ref;
@@ -16,9 +22,18 @@ function _echoFundEstTableItem($ref, $bFair, $bWide = false)
     }
     
     $strOfficialPrice = $ref->GetOfficialNav();
-    $ar[] = $ref->GetPriceDisplay($strOfficialPrice);
-    $ar[] = $ref->GetOfficialDate();
-	$ar[] = $ref->GetPercentageDisplay($strOfficialPrice);
+    if ($strOfficialPrice === false && method_exists($ref, 'GetRateNotConfigured') && $ref->GetRateNotConfigured())
+    {
+    	$ar[] = '<span style="color:#856404" title="请先配置 USCNY、HKCNY 等汇率">请配置汇率</span>';
+    	$ar[] = $ref->GetOfficialDate();
+    	$ar[] = '—';
+    }
+    else
+    {
+    	$ar[] = $ref->GetPriceDisplay($strOfficialPrice);
+    	$ar[] = $ref->GetOfficialDate();
+		$ar[] = $ref->GetPercentageDisplay($strOfficialPrice);
+    }
     
     if ($strFairPrice = $ref->GetFairNav())
     {
@@ -58,6 +73,7 @@ function _getFundEstTableColumn($arRef, &$bFair, $bWide = false)
 {
 	$premium_col = new TableColumnPremium();
 	$ar = array(new TableColumnSymbol());
+	if ($bWide == false)	$ar[] = new TableColumnName();
 	if ($bWide)	$ar = array_merge($ar, GetStockReferenceColumn());
 	$ar[] = new TableColumnOfficalEst();
 	$ar[] = new TableColumnDate();

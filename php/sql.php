@@ -14,7 +14,10 @@ require_once('internallink.php');
 require_once('_private.php');
 require_once('sql/_sqlcommon.php');
 
-define('DB_DATABASE', 'n5gl0n39mnyn183l_camman');
+// 数据库连接配置（主机、用户名、库名；密码在 _private.php 的 DB_PASSWORD）
+define('DB_HOST', '127.0.0.1');
+define('DB_USER', 'morgan');
+define('DB_DATABASE', 'morgan_db');
 
 define('TABLE_FUND_PURCHASE', 'fundpurchase');
 define('TABLE_MEMBER', 'member');
@@ -194,7 +197,7 @@ function SqlConnectDatabase()
 
 	global $g_link;
 
-	$g_link = mysqli_connect('mysql', 'n5gl0n39mnyn183l_woody', DB_PASSWORD);	// Connect to mysql server
+	$g_link = mysqli_connect(DB_HOST, DB_USER, DB_PASSWORD);	// Connect to mysql server
 	if (!$g_link)		die('Failed to connect to server');
 
 	mysqli_set_charset($g_link, 'utf8');
