@@ -4,7 +4,7 @@ require_once('calibrationhistoryparagraph.php');
 require_once('netvaluehistoryparagraph.php');
 
 // $ref from FundReference
-function _echoFundEstTableItem($ref, $bFair, $bWide = false)
+function _echoFundEstTableItem($ref, $bFair, $bRealtime, $bWide = false)
 {
     if (RefHasData($ref) == false)      return;
 
@@ -53,6 +53,16 @@ function _echoFundEstTableItem($ref, $bFair, $bWide = false)
     		$ar[] = $ref->GetPriceDisplay($strRealtimePrice);
     		$ar[] = $ref->GetPercentageDisplay($strRealtimePrice);
     	}
+    	else if ($bRealtime)
+    	{
+    		$ar[] = '—';
+    		$ar[] = '—';
+    	}
+    }
+    else if ($bRealtime)
+    {
+    	$ar[] = '—';
+    	$ar[] = '—';
     }
     
 	RefEchoTableColumn($ref, $ar, $bWide);
@@ -69,7 +79,7 @@ function _callbackSortFundEst($ref)
 	return $ref->GetPercentage($strNav);
 }
 
-function _getFundEstTableColumn($arRef, &$bFair, $bWide = false)
+function _getFundEstTableColumn($arRef, &$bFair, &$bRealtime, $bWide = false)
 {
 	$premium_col = new TableColumnPremium();
 	$ar = array(new TableColumnSymbol());
@@ -79,34 +89,19 @@ function _getFundEstTableColumn($arRef, &$bFair, $bWide = false)
 	$ar[] = new TableColumnDate();
 	$ar[] = $premium_col;
 	
-	$bFair = false;
-    foreach ($arRef as $ref)
-    {
-        if ($ref->GetFairNav())
-        {
-        	$bFair = true;
-        	$ar[] = new TableColumnFairEst();
-        	$ar[] = $premium_col;
-        	break;
-        }
-    }
+	// 固定列：无论当前是否有数据，始终显示参考估值/实时估值及其溢价列
+	$bFair = true;
+	$ar[] = new TableColumnFairEst();
+	$ar[] = $premium_col;
 	
-    foreach ($arRef as $ref)
-    {
-    	if (method_exists($ref, 'GetRealtimeNav'))
-    	{
-    		if ($ref->GetRealtimeNav())
-    		{
-    			$ar[] = new TableColumnRealtimeEst();
-    			$ar[] = $premium_col;
-    			break;
-    		}
-    	}
-    }
+	$bRealtime = true;
+	$ar[] = new TableColumnRealtimeEst();
+	$ar[] = $premium_col;
+
     return $ar;
 }
 
-function _echoFundEstParagraph($arColumn, $bFair, $arRef, $str, $bWide = false)
+function _echoFundEstParagraph($arColumn, $bFair, $bRealtime, $arRef, $str, $bWide = false)
 {
 	if ($str === false)
 	{
@@ -120,14 +115,14 @@ function _echoFundEstParagraph($arColumn, $bFair, $arRef, $str, $bWide = false)
 	}
 	
 	EchoTableParagraphBegin($arColumn, 'estimation', $str);
-    foreach ($arRef as $ref)		_echoFundEstTableItem($ref, $bFair, $bWide);
+    foreach ($arRef as $ref)		_echoFundEstTableItem($ref, $bFair, $bRealtime, $bWide);
     EchoTableParagraphEnd();
 }
 
 function EchoFundArrayEstParagraph($arRef, $str = false, $bWide = false)
 {
-	$arColumn = _getFundEstTableColumn($arRef, $bFair, $bWide);
-	_echoFundEstParagraph($arColumn, $bFair, $arRef, $str, $bWide);
+	$arColumn = _getFundEstTableColumn($arRef, $bFair, $bRealtime, $bWide);
+	_echoFundEstParagraph($arColumn, $bFair, $bRealtime, $arRef, $str, $bWide);
 }
 
 function _getFundPositionStr($ref)
@@ -142,7 +137,7 @@ function _getFundPositionStr($ref)
 function EchoFundEstParagraph($ref)
 {
 	$arRef = array($ref);
-	$arColumn = _getFundEstTableColumn($arRef, $bFair);
+	$arColumn = _getFundEstTableColumn($arRef, $bFair, $bRealtime);
 	
 	$str = _getFundPositionStr($ref);
     if ($ref->GetRealtimeNav())
@@ -157,19 +152,19 @@ function EchoFundEstParagraph($ref)
     	$str .= '关联程度按照100%估算。';
     }
     
-	_echoFundEstParagraph($arColumn, $bFair, $arRef, $str);
+	_echoFundEstParagraph($arColumn, $bFair, $bRealtime, $arRef, $str);
    	EchoCalibrationHistoryParagraph($ref, 0, 1);
 }
 
 function EchoHoldingsEstParagraph($ref)
 {
 	$arRef = array($ref);
-	$arColumn = _getFundEstTableColumn($arRef, $bFair);
+	$arColumn = _getFundEstTableColumn($arRef, $bFair, $bRealtime);
 	
 	$str = _getFundPositionStr($ref);
 	$str .= GetHoldingsLink($ref->GetSymbol()).'更新于'.$ref->GetHoldingsDate().'。';
 
-	_echoFundEstParagraph($arColumn, $bFair, $arRef, $str);
+	_echoFundEstParagraph($arColumn, $bFair, $bRealtime, $arRef, $str);
    	EchoNetValueHistoryParagraph($ref, false, 0, 1);
 }
 

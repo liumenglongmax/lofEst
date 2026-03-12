@@ -1,6 +1,8 @@
 <?php
 
 define('POSITION_EST_LEVEL', '4.0');
+define('QDII_NAV_MIN_WARN', 0.01);
+define('QDII_NAV_MAX_WARN', 1000.0);
 
 function QdiiGetCalibration($strEst, $strCNY, $strNav)
 {
@@ -133,6 +135,46 @@ function QdiiEuGetRealtimeSymbol($strSymbol)
 class _QdiiReference extends FundReference
 {
     var $strOfficialCNY = false;
+
+    function _logAbnormalOfficialNav($strDate, $strEstVal, $strCny, $fNav)
+    {
+    	if (($fNav < QDII_NAV_MIN_WARN) || ($fNav > QDII_NAV_MAX_WARN))
+    	{
+    		DebugString(__CLASS__.' '.$this->GetSymbol()
+    			.' abnormal official nav='.$fNav
+    			.' date='.$strDate
+    			.' est='.$strEstVal
+    			.' cny='.$strCny
+    			.' factor='.$this->fFactor);
+    	}
+    }
+
+    function _hasCalibrationRecord()
+    {
+    	return ($this->calibration_sql->GetRecordNow($this->GetStockId()) ? true : false);
+    }
+
+    function _sanitizeEstimatedNav($fNav, $strTag, $strDate = false)
+    {
+    	$fNav = floatval($fNav);
+    	if ($fNav < QDII_NAV_MIN_WARN || $fNav > QDII_NAV_MAX_WARN)
+    	{
+    		DebugString(__CLASS__.' '.$this->GetSymbol().' abnormal '.$strTag.' nav='.$fNav.' date='.$strDate.' factor='.$this->fFactor);
+    		return false;
+    	}
+
+    	$fPrice = floatval($this->GetPrice());
+    	if ($fPrice > 0.0)
+    	{
+    		$fRatio = $fNav / $fPrice;
+    		if ($fRatio < 0.05 || $fRatio > 20.0)
+    		{
+    			DebugString(__CLASS__.' '.$this->GetSymbol().' abnormal '.$strTag.' ratio='.$fRatio.' nav='.$fNav.' price='.$fPrice.' date='.$strDate);
+    			return false;
+    		}
+    	}
+    	return $fNav;
+    }
     
     public function __construct($strSymbol, $strForex)
     {
@@ -171,21 +213,35 @@ class _QdiiReference extends FundReference
     function EstNetValue()
     {
 		$this->AdjustFactor();
+		$bHasCalibration = $this->_hasCalibrationRecord();
         
        	$cny_ref = $this->GetCnyRef();
        	$est_ref = $this->GetEstRef();
         if ($est_ref == false)    return;
         
         $strDate = $est_ref->GetDate();
-        if ($this->strOfficialCNY = $cny_ref->GetClose($strDate))
+        $bUseFallback = true;
+        if (($this->strOfficialCNY = $cny_ref->GetClose($strDate)) && $bHasCalibration)
         {
 			$strEstVal = $this->_getEstVal($strDate);
-        	$this->fOfficialNetValue = $this->GetQdiiValue($strEstVal, $this->strOfficialCNY);
-            $this->strOfficialDate = $strDate;
-            $this->UpdateEstNetValue();
+        	$fOfficial = $this->GetQdiiValue($strEstVal, $this->strOfficialCNY);
+        	$this->_logAbnormalOfficialNav($strDate, $strEstVal, $this->strOfficialCNY, $fOfficial);
+        	if (($fOfficial = $this->_sanitizeEstimatedNav($fOfficial, 'official', $strDate)) !== false)
+        	{
+        		$this->fOfficialNetValue = $fOfficial;
+            	$this->strOfficialDate = $strDate;
+            	$this->UpdateEstNetValue();
+            	$bUseFallback = false;
+        	}
         }
-        else
+        
+        if ($bUseFallback)
         {   // Load last value from database
+			if ($this->strOfficialCNY && $bHasCalibration == false)
+			{
+				DebugString(__CLASS__.'->'.__FUNCTION__.': skip official nav due to missing calibration '.$this->GetSymbol());
+			}
+			
 			$fund_est_sql = $this->GetFundEstSql();
             if ($record = $fund_est_sql->GetRecordNow($this->GetStockId()))
             {
@@ -206,13 +262,15 @@ class _QdiiReference extends FundReference
     {
        	$est_ref = $this->GetEstRef();
         if ($est_ref == false)    return;
+        if ($this->_hasCalibrationRecord() == false)	return;
         
         $strDate = $est_ref->GetDate();
        	$cny_ref = $this->GetCnyRef();
        	if (($cny_ref->GetDate() != $this->strOfficialDate) || ($strDate != $this->strOfficialDate))
        	{
 			$strEstVal = $this->_getEstVal($strDate);
-        	$this->fFairNetValue = $this->GetQdiiValue($strEstVal);
+        	$fFair = $this->GetQdiiValue($strEstVal);
+        	$this->fFairNetValue = $this->_sanitizeEstimatedNav($fFair, 'fair', $strDate);
        	}
         
 		if ($realtime_ref = $this->GetRealtimeRef())
@@ -233,7 +291,8 @@ class _QdiiReference extends FundReference
             	{
             		$fRealtime *= floatval($realtime_ref->GetPrice()) / $fVal;
             	}
-            	$this->fRealtimeNetValue = $this->GetQdiiValue(strval($fRealtime));
+            	$fRtNav = $this->GetQdiiValue(strval($fRealtime));
+            	$this->fRealtimeNetValue = $this->_sanitizeEstimatedNav($fRtNav, 'realtime', $strDate);
             }
         }
     }

@@ -1,2 +1,3 @@
 .cursor/rules/security-security-baseline.mdc
 php/_private.php
+debug/

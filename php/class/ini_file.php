@@ -1,4 +1,4 @@
-<?
+<?php
 ///////////////////////////////////////////////////////////////////////// http://px.sklar.com/code.html?id=142&fmt=pl
 // 
 //  class.INIFile.php3  -  implements  a  simple  INIFile Parser 

@@ -28,13 +28,34 @@ function ResizeJpg($strPathName, $iNewWidth = 300, $iNewHeight = 420)
 	$strNewRootName = UrlModifyRootFileName($strNewName); 
 	if (!file_exists($strNewRootName))
 	{
-		$imgOrg = imagecreatefromjpeg(UrlModifyRootFileName($strPathName));
+		$strRootName = UrlModifyRootFileName($strPathName);
+		if (!file_exists($strRootName))
+		{
+			return $strPathName;
+		}
+		
+		$imgOrg = @imagecreatefromjpeg($strRootName);
+		if ($imgOrg === false)
+		{
+			return $strPathName;
+		}
+		
 		$iWidth = imagesx($imgOrg);
 		$iHeight = imagesy($imgOrg);
 		DebugString('Converting '.$strNewName);
 		$imgNew = imagecreatetruecolor($iNewWidth, $iNewHeight);
+		if ($imgNew === false)
+		{
+			imagedestroy($imgOrg);
+			return $strPathName;
+		}
 		imagecopyresampled($imgNew, $imgOrg, 0, 0, 0, 0, $iNewWidth, $iNewHeight, $iWidth, $iHeight);
-		imagejpeg($imgNew, $strNewRootName);
+		if (@imagejpeg($imgNew, $strNewRootName) == false)
+		{
+			imagedestroy($imgNew);
+			imagedestroy($imgOrg);
+			return $strPathName;
+		}
 		imagedestroy($imgNew);
 		imagedestroy($imgOrg);
 	}

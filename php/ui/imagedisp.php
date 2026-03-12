@@ -16,7 +16,15 @@ function ImgAutoQuote($strPathName, $strText = '', $bChinese = true)
 	$iDisplayHeight = LayoutGetDisplayHeight();
 	$iFit = LayoutGetDisplayWidth();
 
-	$imgOrg = imagecreatefromjpeg(UrlModifyRootFileName($strPathName));
+	$strRootName = UrlModifyRootFileName($strPathName);
+	if (file_exists($strRootName) == false)
+	{
+		DebugString(__FUNCTION__.' missing image: '.$strPathName);
+		return GetBreakElement().GetQuoteElement($strText).GetBreakElement();
+	}
+
+	// Avoid leaking absolute path through php warning when file is invalid.
+	$imgOrg = @imagecreatefromjpeg($strRootName);
 	if ($imgOrg === false)
 		return GetBreakElement().GetQuoteElement($strText).GetBreakElement();
 
