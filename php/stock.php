@@ -184,11 +184,18 @@ function StockCompareEstResult($fund_est_sql, $strStockId, $strNetValue, $strDat
 
 function StockUpdateEstResult($fund_est_sql, $strStockId, $strNetValue, $strDate)
 {
+	if (empty($strDate))
+	{
+		DebugString(__FUNCTION__.' skip empty date for stock_id='.$strStockId);
+		return false;
+	}
+	
 	$nav_sql = GetNavHistorySql();
 	if ($nav_sql->GetRecord($strStockId, $strDate) == false)
     {   // Only update when net value is NOT ready
-		$fund_est_sql->WriteDaily($strStockId, $strDate, $strNetValue);
+		return $fund_est_sql->WriteDaily($strStockId, $strDate, $strNetValue);
 	}
+	return false;
 }
 
 // ****************************** StockReference public functions *******************************************************
